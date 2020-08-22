@@ -31,62 +31,68 @@ border = 1;
 $fa = 6;
 $fs = min(layer_height, xspace(1/2));
 
-gap_min = 0.1;
-gap_vertical = max(gap_min, layer_height);
-wall_min = 2 * xwall(3) + gap_min;
+wall0 = xwall(3);
+gap0 = 0.05;
+join0 = 10;
+seam0 = 0.33;
+rise0 = 0.33;
 
-module deckbox(in, wall=wall_min, join=10, seam=0.33, rise=0.34, lid=false,
-               ghost=undef) {
-    if (ghost) %deckbox(in, wall, join, seam, rise, lid=!lid, ghost=false);
-    else if (is_undef(ghost)) %cube(in, center=true);
-    // TODO: define internal dividers
-    jwall = fthin(wall/2);
-    out = in + 2 * [wall, wall, wall];
-    w = out[0];
-    d = out[1];
-    h = out[2];
-    z1 = rise * (h - join);
-    z0 = (lid ? 1 - rise - seam : seam) * (h - join);
-    slope = [[-d/2-wall, z0-h/2], [-d/2+wall, z0-h/2],
-             [d/2-wall, z0+z1-h/2], [d/2+wall, z0+z1-h/2],
-             [d/2+wall, h/2+wall], [-d/2-wall, h/2+wall]];
-    gap_lid = lid ? 0 : gap_vertical;
-    rotate([lid ? 180 : 0, 0, 0]) {
-        difference() {
-            union() {
-                difference() {
-                    cube(in + 2 * [wall, wall, wall], center=true);
-                    rotate([90, 0, 90]) linear_extrude(w+2*wall, center=true)
-                        polygon(slope);
-                }
-                if (lid) {
-                    difference() {
-                        cube(out, center=true);
-                        cube(out-[2*jwall, 2*jwall, -tolerance], center=true);
-                    }
-                }
-                else cube(in+[2*jwall, 2*jwall, -tolerance], center=true);
-            }
-            cube(in, center=true);
-            translate([0, 0, join-gap_lid]) rotate([90, 0, 90])
-                linear_extrude(w+2*wall, center=true) polygon(slope);
-        }
+// TODO: dividers
+// TODO: logos & labels
+// TODO: snap fit
+module deckbox(in, wall=wall0, gap=gap0, join=join0, seam=seam0, rise=rise0,
+               lid=false, ghost=undef) {
+    module side(w, d0, d1, h0, h1) {
+        shape = [[0, 0], [0, h0], [d0, h0],
+                 [d0+d1, h0+h1], [d0+d1+d0, h0+h1], [d0+d1+d0, 0]];
+        rotate([90, 0, 90]) linear_extrude(w) polygon(shape);
+    }
+    module box(wall, z0, inset=0) {
+        translate([inset, inset, 0])
+            cube([out[0]-2*inset, wall, z0]);  // front
+        translate([inset, out[1]-wall-inset, 0])
+            cube([out[0]-2*inset, wall, z0+z1]);  // back
+        for (x=[inset, out[0]-wall-inset]) translate([x, inset, 0])
+            side(wall, thick-inset, in[1], z0, z1);
+    }
+
+    thick = 2*wall + gap;
+    in0 = [thick, thick, wall];
+    out = in + 2 * in0;
+    z1 = rise * (in[2] - join);
+    z0 = wall + (lid ? 1 - rise - seam : seam) * (in[2] - join);
+
+    // reference objects
+    %if (ghost) translate([0, out[1], out[2]]) rotate([0, 180, 0])
+        deckbox(in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
+    %if (ghost!=false) translate(in0) cube(in);
+
+    if (lid) translate([out[0], out[1], 0]) rotate(180) {
+        cube([out[0], out[1], wall]);  // floor
+        box(thick, z0);  // wall
+        box(wall, z0+join);  // joint
+    }
+    else {
+        cube([out[0], out[1], wall]);  // floor
+        box(thick, z0);  // wall
+        space = max(gap, layer_height);
+        box(wall, z0+join-space, thick-wall);  // joint
     }
 }
 
-module deckbox_set(in, wall=wall_min, join=10, seam=0.33, rise=0.34) {
-    translate([in[0]/2+2*wall, 0, 0])
-        deckbox(in, wall, join, seam, rise);
-    translate([-in[0]/2-2*wall, 0, 0])
-        rotate([180, 0, 0]) deckbox(in, wall, join, seam, rise, lid=true);
+module set(in, wall=wall0, gap=gap0, join=join0, seam=seam0, rise=rise0) {
+    thick = 2*wall+gap;
+    translate([in[0]+2*thick+10, 0, 0])
+        deckbox(in, wall=wall, gap=gap, join=join, seam=seam, rise=rise);
+    deckbox(in, wall=wall, gap=gap, join=join, seam=seam, rise=rise, lid=true);
 }
 
 Boulder = [68.5, 67.5, 93];
 FFG = [66.5, 0.6, 94];
 
 Warcry = [FFG[0], 36*FFG[1], FFG[2]];
-Test = [15, 10, 20];
+Test = [10, 10, 15];
 
-deckbox_set([10, 5, 15], join=5);
-*deckbox(Boulder);
+set(Test, seam=0, rise=1);
+*deckbox(Boulder, ghost=true);
 *deckbox(Boulder, lid=true);
