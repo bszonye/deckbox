@@ -32,67 +32,125 @@ $fa = 6;
 $fs = min(layer_height, xspace(1/2));
 
 wall0 = xwall(3);
-gap0 = 0.05;
+gap0 = 0.1;
 join0 = 10;
-seam0 = 0.33;
-rise0 = 0.33;
+seam0 = 1/3;
+rise0 = 1/3;
 
 // TODO: dividers
 // TODO: logos & labels
-// TODO: snap fit
-module deckbox(in, wall=wall0, gap=gap0, join=join0, seam=seam0, rise=rise0,
-               lid=false, ghost=undef) {
+module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
+               seam=seam0, rise=rise0, lid=false, ghost=undef) {
     module side(w, d0, d1, h0, h1) {
-        shape = [[0, 0], [0, h0], [d0, h0],
-                 [d0+d1, h0+h1], [d0+d1+d0, h0+h1], [d0+d1+d0, 0]];
-        rotate([90, 0, 90]) linear_extrude(w) polygon(shape);
+        shape = [[0, 0], [0, h0+h1], [d0, h0+h1], [d0+d1, h0], [d0+d1, 0]];
+        if (0<h1) rotate([90, 0, 90]) linear_extrude(w) polygon(shape);
+        if (0<h0) cube([w, d0+d1+d0, h0]);
     }
-    module box(wall, z0, inset=0) {
+    module snap(d, a=0) {
+        jfit = join * cos(atan(z1/run));
+        snaph = xspace(2);
+        snapd = min(d, jfit-2*vgap-2*snaph);
+        rotate([90, 0, a])
+            cylinder(d1=snapd+2*snaph, d2=snapd, h=snaph, center=true);
+    }
+    module box(wall, join=0, inset=0) {
+        space = join && inset ? vgap : 0;
         translate([inset, inset, 0])
-            cube([out[0]-2*inset, wall, z0]);  // front
-        translate([inset, out[1]-wall-inset, 0])
-            cube([out[0]-2*inset, wall, z0+z1]);  // back
-        for (x=[inset, out[0]-wall-inset]) translate([x, inset, 0])
-            side(wall, thick-inset, in[1], z0, z1);
+            cube([box[0]-2*inset, wall, z0+z1+join-space]);  // back
+        translate([inset, box[1]-wall-inset, 0])
+            cube([box[0]-2*inset, wall, z0+join-space]);  // front
+        difference() {
+            for (x=[inset, box[0]-wall-inset]) translate([x, inset, 0])
+                side(wall, thick-inset, run, z0+join-space, z1);
+            if (join) {  // snap
+                y = thick + 4/5*run;
+                z = z0 + 1/5*z1 + join/2;
+                translate([inset?inset:wall, y, z])
+                    snap(join/4, inset?90:-90);
+                translate([box[0]-(inset?inset:wall), y, z]) mirror([1, 0, 0])
+                    snap(join/4, inset?90:-90);
+            }
+        }
+        if (join) {  // snap
+            y = thick + 1/5*run;
+            z = z0 + 4/5*z1 + join/2;
+            translate([inset?inset:wall, y, z]) mirror([1, 0, 0])
+                snap(join/4, inset?90:-90);
+            translate([box[0]-(inset?inset:wall), y, z])
+                snap(join/4, inset?90:-90);
+        }
+    }
+    module bevel(b=1) {
+        translate([box[0]/2, 0, 0]) rotate([45, 0, 0])
+            cube([box[0]+1, b, b], center=true);
+        translate([box[0]/2, box[1], 0]) rotate([45, 0, 0])
+            cube([box[0]+1, b, b], center=true);
+        translate([0, box[1]/2, 0]) rotate([0, 45, 0])
+            cube([b, box[1]+1, b], center=true);
+        translate([box[0], box[1]/2, 0]) rotate([0, 45, 0])
+            cube([b, box[1]+1, b], center=true);
     }
 
+    vgap = max(gap, layer_height);
     thick = 2*wall + gap;
     in0 = [thick, thick, wall];
-    out = in + 2 * in0;
-    z1 = rise * (in[2] - join);
-    z0 = wall + (lid ? 1 - rise - seam : seam) * (in[2] - join);
+    box = is_undef(out) ? in + 2*in0 : out;
+    run = box[1]-2*thick;
+    z1 = rise * (box[2] - join);
+    z0 = (lid ? 1 - rise - seam : seam) * (box[2] - join);
+    echo(z1, run, atan(z1/run));
 
     // reference objects
-    %if (ghost) translate([0, out[1], out[2]]) rotate([0, 180, 0])
-        deckbox(in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
-    %if (ghost!=false) translate(in0) cube(in);
+    %if (ghost) translate([0, box[1], box[2]]) rotate([0, 180, 0])
+        deckbox(out, in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
+    %if (ghost!=false) translate(in0) cube(box-2*in0);
 
-    if (lid) translate([out[0], out[1], 0]) rotate(180) {
-        cube([out[0], out[1], wall]);  // floor
-        box(thick, z0);  // wall
-        box(wall, z0+join);  // joint
-    }
-    else {
-        cube([out[0], out[1], wall]);  // floor
-        box(thick, z0);  // wall
-        space = max(gap, layer_height);
-        box(wall, z0+join-space, thick-wall);  // joint
+    difference() {
+        if (lid) {
+            cube([box[0], box[1], wall]);  // floor
+            box(thick);  // wall
+            box(wall, join);  // joint
+        }
+        else {
+            inset = thick - wall;
+            translate([inset, inset, 0])
+                cube([box[0]-2*inset, box[1]-2*inset, wall]);  // floor
+            box(thick);  // wall
+            box(wall, join, inset);  // joint
+        }
+        bevel(wall*sqrt(2));
     }
 }
 
-module set(in, wall=wall0, gap=gap0, join=join0, seam=seam0, rise=rise0) {
+module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
+           seam=seam0, rise=rise0, ghost=undef) {
     thick = 2*wall+gap;
-    translate([in[0]+2*thick+10, 0, 0])
-        deckbox(in, wall=wall, gap=gap, join=join, seam=seam, rise=rise);
-    deckbox(in, wall=wall, gap=gap, join=join, seam=seam, rise=rise, lid=true);
+    in0 = [thick, thick, wall];
+    box = is_undef(out) ? in + 2*in0 : out;
+    echo(box);
+    echo(box-2*in0);
+    translate([box[0]+10, 0, 0])
+        deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
+                seam=seam, rise=rise, ghost=ghost);
+    deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
+            seam=seam, rise=rise, lid=true, ghost=ghost);
 }
 
-Boulder = [68.5, 67.5, 93];
+Boulder80 = [68.5, 55, 93];
+Boulder100 = [68.5, 67.5, 93];
 FFG = [66.5, 0.6, 94];
 
-Warcry = [FFG[0], 36*FFG[1], FFG[2]];
 Test = [10, 10, 15];
+Rocky = [75, 60, 100];
+Warcry = [75, 40*0.6, 100];
 
-set(Test, seam=0, rise=1);
-*deckbox(Boulder, ghost=true);
-*deckbox(Boulder, lid=true);
+*set(in=Test, seam=0, rise=1);
+*deckbox(Rocky, ghost=false);
+*deckbox(Rocky, lid=true, ghost=false);
+*deckbox(in=Boulder80, ghost=true);
+*deckbox(in=Boulder80, lid=true);
+
+*set(Rocky, ghost=false);
+*set(Warcry, ghost=false);
+set([25, 40*.6, 60], seam=0.2, rise=0.6);
+*set([25, 25, 25], seam=0.1, rise=0.8);
