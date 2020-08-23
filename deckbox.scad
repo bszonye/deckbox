@@ -31,6 +31,19 @@ border = 1;
 $fa = 6;
 $fs = min(layer_height, xspace(1/2));
 
+card = [2.5*25.4, 0.325, 3.5*25.4];  // standard playing card dimensions
+double_sleeve = 0.3;
+thick_sleeve = 0.2;
+thin_sleeve = 0.1;
+function double_sleeve_count(d) = floor(d / (card[1] + double_sleeve));
+function thick_sleeve_count(d) = floor(d / (card[1] + thick_sleeve));
+function thin_sleeve_count(d) = floor(d / (card[1] + thin_sleeve));
+function unsleeved_count(d) = floor(d / card[1]);
+echo(card);
+
+// common sleeve dimensions
+FFG = [66.5, 0.2, 94];
+
 wall0 = xwall(3);
 gap0 = 0.1;
 join0 = 10;
@@ -80,25 +93,38 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
                 snap(join/4, inset?90:-90);
         }
     }
-    module bevel(b=1) {
+    module bevel(xy=sqrt(2)*xspace(2), z=sqrt(2)*xspace(2)) {
         translate([box[0]/2, 0, 0]) rotate([45, 0, 0])
-            cube([box[0]+1, b, b], center=true);
+            cube([box[0]+1, xy, xy], center=true);
         translate([box[0]/2, box[1], 0]) rotate([45, 0, 0])
-            cube([box[0]+1, b, b], center=true);
+            cube([box[0]+1, xy, xy], center=true);
         translate([0, box[1]/2, 0]) rotate([0, 45, 0])
-            cube([b, box[1]+1, b], center=true);
+            cube([xy, box[1]+1, xy], center=true);
         translate([box[0], box[1]/2, 0]) rotate([0, 45, 0])
-            cube([b, box[1]+1, b], center=true);
+            cube([xy, box[1]+1, xy], center=true);
+        translate([0, 0, box[2]/2]) rotate([0, 0, 45])
+            cube([z, z, box[2]+1], center=true);
+        translate([0, box[1], box[2]/2]) rotate([0, 0, 45])
+            cube([z, z, box[2]+1], center=true);
+        translate([box[0], 0, box[2]/2]) rotate([0, 0, 45])
+            cube([z, z, box[2]+1], center=true);
+        translate([box[0], box[1], box[2]/2]) rotate([0, 0, 45])
+            cube([z, z, box[2]+1], center=true);
     }
 
     vgap = max(gap, layer_height);
+    flat = round(wall/layer_height) * layer_height;
     thick = 2*wall + gap;
-    in0 = [thick, thick, wall];
+    in0 = [thick, thick, flat];
     box = is_undef(out) ? in + 2*in0 : out;
     run = box[1]-2*thick;
     z1 = rise * (box[2] - join);
     z0 = (lid ? 1 - rise - seam : seam) * (box[2] - join);
-    echo(z1, run, atan(z1/run));
+    echo("lid angle", z1, run, atan(z1/run));
+    echo("double sleeve", double_sleeve_count(box[1]));
+    echo("thick sleeve", thick_sleeve_count(box[1]));
+    echo("thin sleeve", thin_sleeve_count(box[1]));
+    echo("unsleeved", unsleeved_count(box[1]));
 
     // reference objects
     %if (ghost) translate([0, box[1], box[2]]) rotate([0, 180, 0])
@@ -107,25 +133,26 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
 
     difference() {
         if (lid) {
-            cube([box[0], box[1], wall]);  // floor
-            box(thick);  // wall
+            cube([box[0], box[1], flat]);  // floor
+            #box(thick);  // wall
             box(wall, join);  // joint
         }
         else {
             inset = thick - wall;
             translate([inset, inset, 0])
-                cube([box[0]-2*inset, box[1]-2*inset, wall]);  // floor
+                cube([box[0]-2*inset, box[1]-2*inset, flat]);  // floor
             box(thick);  // wall
             box(wall, join, inset);  // joint
         }
-        bevel(wall*sqrt(2));
+        bevel();
     }
 }
 
 module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
            seam=seam0, rise=rise0, ghost=undef) {
-    thick = 2*wall+gap;
-    in0 = [thick, thick, wall];
+    flat = round(wall/layer_height) * layer_height;
+    thick = 2*wall + gap;
+    in0 = [thick, thick, flat];
     box = is_undef(out) ? in + 2*in0 : out;
     echo(box);
     echo(box-2*in0);
@@ -136,21 +163,32 @@ module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
             seam=seam, rise=rise, lid=true, ghost=ghost);
 }
 
-Boulder80 = [68.5, 55, 93];
-Boulder100 = [68.5, 67.5, 93];
-FFG = [66.5, 0.6, 94];
+// commercial box sizes
+Boulder100int = [68.5, 67.5, 93];
+Boulder80int = [68.5, 55, 93];
+Boulder60int = [68.5, 46.5, 93];
+Boulder40int = [68.5, 30, 93];
+Boulder100ext = [76, 75, 93];
+Boulder80ext = [76, 60, 98.5];
+Boulder60ext = [76, 49.9, 98.5];
+Boulder40ext = [76, 35, 98.5];
 
-Test = [10, 10, 15];
-Rocky = [75, 60, 100];
-Warcry = [75, 40*0.6, 100];
+Rocky75 = [75, 300/4, 98.5];
+Rocky60 = [75, 300/5, 98.5];
+Rocky50 = [75, 300/6, 98.5];
+Rocky37 = [75, 300/8, 98.5];
+Rocky33 = [75, 300/9, 98.5];
+Rocky30 = [75, 300/10, 98.5];
+Rocky25 = [75, 300/12, 98.5];
 
-*set(in=Test, seam=0, rise=1);
 *deckbox(Rocky, ghost=false);
 *deckbox(Rocky, lid=true, ghost=false);
 *deckbox(in=Boulder80, ghost=true);
 *deckbox(in=Boulder80, lid=true);
 
-*set(Rocky, ghost=false);
-*set(Warcry, ghost=false);
-set([25, 40*.6, 60], seam=0.2, rise=0.6);
+*set([25, 40*.6, 60], seam=0.2, rise=0.6);
 *set([25, 25, 25], seam=0.1, rise=0.8);
+
+*set(Rocky30);
+*deckbox(Rocky30);
+deckbox(Rocky30, lid=true);
