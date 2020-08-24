@@ -39,7 +39,6 @@ function double_sleeve_count(d) = floor(d / (card[1] + double_sleeve));
 function thick_sleeve_count(d) = floor(d / (card[1] + thick_sleeve));
 function thin_sleeve_count(d) = floor(d / (card[1] + thin_sleeve));
 function unsleeved_count(d) = floor(d / card[1]);
-echo(card);
 
 // common sleeve dimensions
 FFG = [66.5, 0.2, 94];
@@ -120,6 +119,8 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
     run = box[1]-2*thick;
     z1 = rise * (box[2] - join);
     z0 = (lid ? 1 - rise - seam : seam) * (box[2] - join);
+    echo("exterior", box);
+    echo("interior", box - 2*in0);
     echo("lid angle", z1, run, atan(z1/run));
     echo("double sleeve", double_sleeve_count(box[1]));
     echo("thick sleeve", thick_sleeve_count(box[1]));
