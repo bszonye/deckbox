@@ -40,6 +40,8 @@ function thick_sleeve_count(d) = floor(d / (card[1] + thick_sleeve));
 function thin_sleeve_count(d) = floor(d / (card[1] + thin_sleeve));
 function unsleeved_count(d) = floor(d / card[1]);
 
+function unit_axis(n) = [for (i=[0:1:2]) i==n ? 1 : 0];
+
 // common sleeve dimensions
 FFG = [66.5, 0.2, 94];
 
@@ -49,10 +51,90 @@ join0 = 10;
 seam0 = 1/3;
 rise0 = 1/3;
 
+module beveler(size, flats=1, walls=1, center=false) {
+    function unit_axis(n) = [for (i=[0:1:2]) i==n ? 1 : 0];
+    module bevel(w, n=0) {
+        a = unit_axis(n);
+        v = [1, 1, 1] - a;
+        aj = (n-1+3) % 3;
+        ak = (n+1+3) % 3;
+        for (j=[1,-1]) for (k=[1,-1]) {
+            dj = j*unit_axis(aj)*size[aj]/2;
+            dk = k*unit_axis(ak)*size[ak]/2;
+            translate(origin+dj+dk)
+                rotate(45*a) cube(a*(size[n]+10) + v*sqrt(2)*w, center=true);
+        }
+    }
+    xy = sqrt(2) * flats;
+    z = sqrt(2) * walls;
+    origin = center ? [0, 0, 0] : size/2;
+    bevel(flats, 0);
+    bevel(flats, 1);
+    bevel(walls, 2);
+}
+
+module beveled_cube(size, flats=1, walls=1, center=false) {
+    difference() {
+        cube(size, center);
+        beveler(size=size, flats=flats, walls=walls, center=center);
+    }
+}
+
+module rounder(size, flats=1, walls=1, center=false) {
+    module bevel(w, n=0) {
+        a = unit_axis(n);
+        v = [1, 1, 1] - a;
+        aj = (n-1+3) % 3;
+        ak = (n+1+3) % 3;
+        for (j=[1,-1]) for (k=[1,-1]) {
+            dj = j*unit_axis(aj)*size[aj]/2;
+            dk = k*unit_axis(ak)*size[ak]/2;
+            translate(origin+dj+dk)
+                rotate(45*a) cube(a*(size[n]+10) + v*sqrt(2)*w, center=true);
+        }
+    }
+    xy = sqrt(2) * flats;
+    z = sqrt(2) * walls;
+    origin = center ? [0, 0, 0] : size/2;
+    bevel(flats, 0);
+    bevel(flats, 1);
+    bevel(walls, 2);
+}
+
+module rounded_cube(size, flats=1, walls=1, axis=undef, center=false) {
+    if (is_undef(axis)) intersection() {
+        intersection_for (a=[0:1:2])
+            rounded_cube(axis=a,
+                         size=size, flats=flats, walls=walls, center=center);
+    }
+    else {
+        origin = center ? [0, 0, 0] : size/2;
+        w = axis<2 ? flats : walls;
+        a = unit_axis(axis);
+        ac = [[0, 90, 0], [90, 0, 0], [0, 0, 0]];
+        aj = (axis-1+3) % 3;
+        ak = (axis+1+3) % 3;
+        translate(origin) {
+            wj0 = unit_axis(aj)*size[aj];
+            wj1 = unit_axis(aj)*(size[aj]-2*w);
+            wk0 = unit_axis(ak)*size[ak];
+            wk1 = unit_axis(ak)*(size[ak]-2*w);
+            hull() {
+                cube(a*size[axis] + wj0 + wk1, center=true);
+                cube(a*size[axis] + wj1 + wk0, center=true);
+                for (j=[1,-1]) for (k=[1,-1]) {
+                    translate(j*wj1/2+k*wk1/2) rotate(ac[axis])
+                        cylinder(r=w, h=size[axis], center=true);
+                }
+            }
+        }
+    }
+}
+
 // TODO: dividers
 // TODO: logos & labels
 module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
-               seam=seam0, rise=rise0, lid=false, ghost=undef) {
+               seam=seam0, rise=rise0, rounded=true, lid=false, ghost=undef) {
     module side(w, d0, d1, h0, h1) {
         shape = [[0, 0], [0, h0+h1], [d0, h0+h1], [d0+d1, h0], [d0+d1, 0]];
         if (0<h1) rotate([90, 0, 90]) linear_extrude(w) polygon(shape);
@@ -92,24 +174,6 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
                 snap(join/4, inset?90:-90);
         }
     }
-    module bevel(xy=sqrt(2)*xspace(2), z=sqrt(2)*xspace(2)) {
-        translate([box[0]/2, 0, 0]) rotate([45, 0, 0])
-            cube([box[0]+1, xy, xy], center=true);
-        translate([box[0]/2, box[1], 0]) rotate([45, 0, 0])
-            cube([box[0]+1, xy, xy], center=true);
-        translate([0, box[1]/2, 0]) rotate([0, 45, 0])
-            cube([xy, box[1]+1, xy], center=true);
-        translate([box[0], box[1]/2, 0]) rotate([0, 45, 0])
-            cube([xy, box[1]+1, xy], center=true);
-        translate([0, 0, box[2]/2]) rotate([0, 0, 45])
-            cube([z, z, box[2]+1], center=true);
-        translate([0, box[1], box[2]/2]) rotate([0, 0, 45])
-            cube([z, z, box[2]+1], center=true);
-        translate([box[0], 0, box[2]/2]) rotate([0, 0, 45])
-            cube([z, z, box[2]+1], center=true);
-        translate([box[0], box[1], box[2]/2]) rotate([0, 0, 45])
-            cube([z, z, box[2]+1], center=true);
-    }
 
     vgap = max(gap, layer_height);
     flat = round(wall/layer_height) * layer_height;
@@ -132,10 +196,10 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
         deckbox(out, in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
     %if (ghost!=false) translate(in0) cube(box-2*in0);
 
-    difference() {
+    intersection() {
         if (lid) {
             cube([box[0], box[1], flat]);  // floor
-            #box(thick);  // wall
+            box(thick);  // wall
             box(wall, join);  // joint
         }
         else {
@@ -145,12 +209,13 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
             box(thick);  // wall
             box(wall, join, inset);  // joint
         }
-        bevel();
+        if (rounded) rounded_cube(box, flat, wall/2);
+        else beveled_cube(box, flat, wall/2);
     }
 }
 
 module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
-           seam=seam0, rise=rise0, ghost=undef) {
+           seam=seam0, rise=rise0, rounded=true, ghost=undef) {
     flat = round(wall/layer_height) * layer_height;
     thick = 2*wall + gap;
     in0 = [thick, thick, flat];
@@ -159,9 +224,9 @@ module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
     echo(box-2*in0);
     translate([box[0]+10, 0, 0])
         deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
-                seam=seam, rise=rise, ghost=ghost);
+                seam=seam, rise=rise, rounded=rounded, ghost=ghost);
     deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
-            seam=seam, rise=rise, lid=true, ghost=ghost);
+            seam=seam, rise=rise, rounded=rounded, lid=true, ghost=ghost);
 }
 
 // commercial box sizes
@@ -190,6 +255,6 @@ Rocky25 = [75, 300/12, 98.5];
 *set([25, 40*.6, 60], seam=0.2, rise=0.6);
 *set([25, 25, 25], seam=0.1, rise=0.8);
 
-*set(Rocky30);
+set(Rocky30);
 *deckbox(Rocky30);
-deckbox(Rocky30, lid=true);
+*deckbox(Rocky30, lid=true);
