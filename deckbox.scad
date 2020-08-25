@@ -124,7 +124,8 @@ module rounded_cube(size, flats=1, walls=1, axis=undef, center=false) {
                 cube(a*size[axis] + wj1 + wk0, center=true);
                 for (j=[1,-1]) for (k=[1,-1]) {
                     translate(j*wj1/2+k*wk1/2) rotate(ac[axis])
-                        cylinder(r=w, h=size[axis], center=true);
+                        rotate(15)
+                        cylinder(r=w, h=size[axis], center=true, $fa=30);
                 }
             }
         }
@@ -209,8 +210,8 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
             box(thick);  // wall
             box(wall, join, inset);  // joint
         }
-        if (rounded) rounded_cube(box, flat, wall/2);
-        else beveled_cube(box, flat, wall/2);
+        if (rounded) rounded_cube(box, thick, wall);
+        else beveled_cube(box, thick, xspace(2));
     }
 }
 
