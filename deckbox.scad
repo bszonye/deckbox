@@ -187,10 +187,10 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
     echo("exterior", box);
     echo("interior", box - 2*in0);
     echo("lid angle", z1, run, atan(z1/run));
-    echo("double sleeve", double_sleeve_count(box[1]));
-    echo("thick sleeve", thick_sleeve_count(box[1]));
-    echo("thin sleeve", thin_sleeve_count(box[1]));
-    echo("unsleeved", unsleeved_count(box[1]));
+    echo("double sleeve", double_sleeve_count(run));
+    echo("thick sleeve", thick_sleeve_count(run));
+    echo("thin sleeve", thin_sleeve_count(run));
+    echo("unsleeved", unsleeved_count(run));
 
     // reference objects
     %if (ghost) translate([0, box[1], box[2]]) rotate([0, 180, 0])
