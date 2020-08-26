@@ -176,21 +176,28 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
         deckbox(out, in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
     %if (ghost!=false) translate(in0) cube(box-2*in0);
 
-    intersection() {
-        if (lid) {
-            cube([box[0], box[1], flat]);  // floor
-            box(thick);  // wall
-            box(wall, join);  // joint
+    difference() {
+        intersection() {
+            if (lid) {
+                cube([box[0], box[1], flat]);  // floor
+                box(thick);  // wall
+                box(wall, join);  // joint
+            }
+            else {
+                inset = thick - wall;
+                translate([inset, inset, 0])
+                    cube([box[0]-2*inset, box[1]-2*inset, flat]);  // floor
+                box(thick);  // wall
+                box(wall, join, inset);  // joint
+            }
+            if (rounded) rounded_cube(box, thick, wall);
+            else beveled_cube(box, thick, xspace(2));
         }
-        else {
-            inset = thick - wall;
-            translate([inset, inset, 0])
-                cube([box[0]-2*inset, box[1]-2*inset, flat]);  // floor
-            box(thick);  // wall
-            box(wall, join, inset);  // joint
-        }
-        if (rounded) rounded_cube(box, thick, wall);
-        else beveled_cube(box, thick, xspace(2));
+        translate([box[0]/2, 0, (z0+z1+(lid?join:0))/2])
+            rotate([90, lid?180:0, 0])
+            for (d=[0,1])
+                linear_extrude(xspace(2-d), center=true)
+                    offset(r=d*layer_height) children();
     }
 }
 
@@ -204,9 +211,9 @@ module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
     echo(box-2*in0);
     translate([box[0]+10, 0, 0])
         deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
-                seam=seam, rise=rise, rounded=rounded, ghost=ghost);
-    deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
-            seam=seam, rise=rise, rounded=rounded, lid=true, ghost=ghost);
+                seam=seam, rise=rise, rounded=rounded, ghost=ghost) children();
+    deckbox(out=out, in=in, wall=wall, gap=gap, join=join, seam=seam,
+            rise=rise, rounded=rounded, lid=true, ghost=ghost) children();
 }
 
 module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
@@ -247,7 +254,17 @@ Rocky25 = [75, 300/12, 98.5];
 
 *set(Rocky30);
 *deckbox(Rocky30);
-deckbox(Rocky30, lid=true);
+*deckbox(Rocky30, lid=true);
+
+deckbox(Rocky30, lid=true) {
+    $fa=6;
+    difference() {
+        circle(d=45);
+        circle(d=40);
+    }
+    text("B", font="Palatino Linotype", size=30,
+         halign="center", valign="center");
+}
 
 *bevel_test([25, 25, 5]);
 
