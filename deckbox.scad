@@ -80,58 +80,31 @@ module beveled_cube(size, flats=1, walls=1, center=false) {
     }
 }
 
-module rounded_cube(size, flats=2.5, walls=1.2, center=false) {
+module rounded_cube(size, thick=2*wall0+gap0, walls=wall0, center=false) {
     origin = center ? [0, 0, 0] : size/2;
     translate(origin) hull() {
         // rounded ends should be tangent to sides but sunk into the end to a
         // 30- or 45-degree angle to avoid overhangs
-        angle = 30;
-        za = cos(angle);
         x = size[0]/2;
         y = size[1]/2;
         z = size[2]/2;
-        R = flats / 1;  // or over za
-        B = walls;
+        R = max(thick, walls);
+        B = min(thick, walls);
         L = B*sqrt(2)/2;
         S = R - sqrt(R*R - L*L);
         O = (R+L-S)*sqrt(2)/2;  // (R-S)*sqrt(2)/2;
+        $fa=15;
         intersection() {
             cube(size, center=true);
             hull() {
                 for (xs=[1,-1]) for (ys=[1,-1]) for (zs=[1,-1]) {
-                    translate([xs*(x-O), ys*(y-O), zs*(z-za*R)])
-                        sphere(r=R, $fa=10);
-                }
-            }
-        }
-    }
-}
-
-module rounded_cube_0(size, flats=1, walls=1, axis=undef, center=false) {
-    if (is_undef(axis)) intersection() {
-        intersection_for (a=[0:1:2])
-            rounded_cube(axis=a,
-                         size=size, flats=flats, walls=walls, center=center);
-    }
-    else {
-        origin = center ? [0, 0, 0] : size/2;
-        w = axis<2 ? flats : walls;
-        a = unit_axis(axis);
-        ac = [[0, 90, 0], [90, 0, 0], [0, 0, 0]];
-        aj = (axis-1+3) % 3;
-        ak = (axis+1+3) % 3;
-        translate(origin) {
-            wj0 = unit_axis(aj)*size[aj];
-            wj1 = unit_axis(aj)*(size[aj]-2*w);
-            wk0 = unit_axis(ak)*size[ak];
-            wk1 = unit_axis(ak)*(size[ak]-2*w);
-            hull() {
-                cube(a*size[axis] + wj0 + wk1, center=true);
-                cube(a*size[axis] + wj1 + wk0, center=true);
-                for (j=[1,-1]) for (k=[1,-1]) {
-                    translate(j*wj1/2+k*wk1/2) rotate(ac[axis])
-                        rotate(15)
-                        cylinder(r=w, h=size[axis], center=true, $fa=30);
+                    translate([xs*(x-O), ys*(y-O), zs*(z-O)]) sphere(r=R);
+                    translate([0, ys*(y-O), zs*(z-O)])
+                        rotate([0, xs*90, 0]) cylinder(r=R, h=x-R);
+                    translate([xs*(x-O), 0, zs*(z-O)])
+                        rotate([ys*90, 0, 0]) cylinder(r=R, h=y-R);
+                    translate([xs*(x-O), ys*(y-O), 0])
+                        rotate([zs*90+90, 0, 0]) cylinder(r=R, h=z-R);
                 }
             }
         }
@@ -236,6 +209,16 @@ module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
             seam=seam, rise=rise, rounded=rounded, lid=true, ghost=ghost);
 }
 
+module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
+    box = [out[0], out[1], 2*out[2]];
+    flat = round(wall/layer_height) * layer_height;
+    difference() {
+        deckbox(out=box, wall=wall, gap=gap, join=out[2]-flat,
+                rounded=rounded, lid=true, ghost=false);
+        translate([-1/2, -1/2, out[2]]) cube(box+[1,1,1]);
+    }
+}
+
 // commercial box sizes
 Boulder100int = [68.5, 67.5, 93];
 Boulder80int = [68.5, 55, 93];
@@ -264,17 +247,8 @@ Rocky25 = [75, 300/12, 98.5];
 
 *set(Rocky30);
 *deckbox(Rocky30);
-*deckbox(Rocky30, lid=true);
+deckbox(Rocky30, lid=true);
 
-module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
-    box = [out[0], out[1], 2*out[2]];
-    flat = round(wall/layer_height) * layer_height;
-    difference() {
-        deckbox(out=box, wall=wall, gap=gap, join=out[2]-flat,
-                rounded=rounded, lid=true, ghost=false);
-        translate([-1/2, -1/2, out[2]]) cube(box+[1,1,1]);
-    }
-}
-bevel_test([25, 25, 5]);
+*bevel_test([25, 25, 5]);
 
 *rounded_cube(Rocky30);
