@@ -28,7 +28,7 @@ function fthin(x=xwall(), n=4.5) = x < xwall(n) ? fwall(x) : x;
 tolerance = 0.001;
 border = 1;
 
-$fa = 6;
+$fa = 30;
 $fs = min(layer_height, xspace(1/2));
 
 card = [2.5*25.4, 0.325, 3.5*25.4];  // standard playing card dimensions
@@ -80,28 +80,34 @@ module beveled_cube(size, flats=1, walls=1, center=false) {
     }
 }
 
-module rounder(size, flats=1, walls=1, center=false) {
-    module bevel(w, n=0) {
-        a = unit_axis(n);
-        v = [1, 1, 1] - a;
-        aj = (n-1+3) % 3;
-        ak = (n+1+3) % 3;
-        for (j=[1,-1]) for (k=[1,-1]) {
-            dj = j*unit_axis(aj)*size[aj]/2;
-            dk = k*unit_axis(ak)*size[ak]/2;
-            translate(origin+dj+dk)
-                rotate(45*a) cube(a*(size[n]+10) + v*sqrt(2)*w, center=true);
+module rounded_cube(size, flats=3, walls=1, center=false) {
+    origin = center ? [0, 0, 0] : size/2;
+    translate(origin) hull() {
+        // rounded ends should be tangent to sides but sunk into the end to a
+        // 30- or 45-degree angle to avoid overhangs
+        angle = 30;
+        za = cos(angle);
+        x = size[0]/2;
+        y = size[1]/2;
+        z = size[2]/2;
+        R = flats;
+        B = walls;
+        S = R - sqrt(R*R - B*B/2);
+        O = R - S;  // sqrt(2) * S;
+        echo(R, B, S);
+        intersection() {
+            cube(size, center=true);
+            hull() {
+                for (xs=[1,-1]) for (ys=[1,-1]) for (zs=[1,-1]) {
+                    translate([xs*(x-O), ys*(y-O), zs*(z-za*R)])
+                        #sphere(R, $fa=15);
+                }
+            }
         }
     }
-    xy = sqrt(2) * flats;
-    z = sqrt(2) * walls;
-    origin = center ? [0, 0, 0] : size/2;
-    bevel(flats, 0);
-    bevel(flats, 1);
-    bevel(walls, 2);
 }
 
-module rounded_cube(size, flats=1, walls=1, axis=undef, center=false) {
+module rounded_cube_0(size, flats=1, walls=1, axis=undef, center=false) {
     if (is_undef(axis)) intersection() {
         intersection_for (a=[0:1:2])
             rounded_cube(axis=a,
@@ -256,6 +262,8 @@ Rocky25 = [75, 300/12, 98.5];
 *set([25, 40*.6, 60], seam=0.2, rise=0.6);
 *set([25, 25, 25], seam=0.1, rise=0.8);
 
-set(Rocky30);
+*set(Rocky30);
 *deckbox(Rocky30);
 *deckbox(Rocky30, lid=true);
+
+rounded_cube(Rocky30);
