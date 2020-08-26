@@ -80,7 +80,7 @@ module beveled_cube(size, flats=1, walls=1, center=false) {
     }
 }
 
-module rounded_cube(size, flats=3, walls=1, center=false) {
+module rounded_cube(size, flats=2.5, walls=1.2, center=false) {
     origin = center ? [0, 0, 0] : size/2;
     translate(origin) hull() {
         // rounded ends should be tangent to sides but sunk into the end to a
@@ -90,17 +90,17 @@ module rounded_cube(size, flats=3, walls=1, center=false) {
         x = size[0]/2;
         y = size[1]/2;
         z = size[2]/2;
-        R = flats;
+        R = flats / 1;  // or over za
         B = walls;
-        S = R - sqrt(R*R - B*B/2);
-        O = R - S;  // sqrt(2) * S;
-        echo(R, B, S);
+        L = B*sqrt(2)/2;
+        S = R - sqrt(R*R - L*L);
+        O = (R+L-S)*sqrt(2)/2;  // (R-S)*sqrt(2)/2;
         intersection() {
             cube(size, center=true);
             hull() {
                 for (xs=[1,-1]) for (ys=[1,-1]) for (zs=[1,-1]) {
                     translate([xs*(x-O), ys*(y-O), zs*(z-za*R)])
-                        #sphere(R, $fa=15);
+                        sphere(r=R, $fa=10);
                 }
             }
         }
@@ -266,4 +266,15 @@ Rocky25 = [75, 300/12, 98.5];
 *deckbox(Rocky30);
 *deckbox(Rocky30, lid=true);
 
-rounded_cube(Rocky30);
+module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
+    box = [out[0], out[1], 2*out[2]];
+    flat = round(wall/layer_height) * layer_height;
+    difference() {
+        deckbox(out=box, wall=wall, gap=gap, join=out[2]-flat,
+                rounded=rounded, lid=true, ghost=false);
+        translate([-1/2, -1/2, out[2]]) cube(box+[1,1,1]);
+    }
+}
+bevel_test([25, 25, 5]);
+
+*rounded_cube(Rocky30);
