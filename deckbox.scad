@@ -28,8 +28,8 @@ function fthin(x=xwall(), n=4.5) = x < xwall(n) ? fwall(x) : x;
 tolerance = 0.001;
 border = 1;
 
-$fa = 30;
-$fs = min(layer_height, xspace(1/2));
+$fa = 15;
+$fs = min(layer_height/2, xspace(1)/2);
 
 card = [2.5*25.4, 0.325, 3.5*25.4];  // standard playing card dimensions
 double_sleeve = 0.3;
@@ -47,6 +47,7 @@ FFG = [66.5, 0.2, 94];
 
 wall0 = xwall(3);
 gap0 = 0.1;
+thick0 = 2*wall0 + gap0;
 join0 = 10;
 seam0 = 1/3;
 rise0 = 1/3;
@@ -80,39 +81,36 @@ module beveled_cube(size, flats=1, walls=1, center=false) {
     }
 }
 
-module rounded_cube(size, thick=2*wall0+gap0, walls=wall0, center=false) {
+module rounded_cube(size, thick=thick0, walls=wall0, center=false) {
+    R = max(thick, walls);
+    B = min(thick, walls);
+    L = B*sqrt(2)/2;
+    S = R - sqrt(R*R - L*L);
+    O = (R+L-S)*sqrt(2)/2;  // (R-S)*sqrt(2)/2;
+    $fa = 6;
+    module axis(x, y, z, a=[0, 0, 0]) {
+        rotate(a)
+        for (s0=[1,-1]) for (s1=[1,-1]) {
+            // 1/2-step rotation aligns all the spheres & cylinders
+            translate([s0*(x-O), s1*(y-O), 0])
+                rotate($fa/2) cylinder(r=R, h=2*(z-O), center=true);
+            if (a == [0, 0, 0])  // corners
+                for (s2=[1,-1]) translate([s0*(x-O), s1*(y-O), s2*(z-O)])
+                    rotate($fa/2) sphere(r=R);
+        }
+    }
     origin = center ? [0, 0, 0] : size/2;
-    translate(origin) hull() {
-        // rounded ends should be tangent to sides but sunk into the end to a
-        // 30- or 45-degree angle to avoid overhangs
-        x = size[0]/2;
-        y = size[1]/2;
-        z = size[2]/2;
-        R = max(thick, walls);
-        B = min(thick, walls);
-        L = B*sqrt(2)/2;
-        S = R - sqrt(R*R - L*L);
-        O = (R+L-S)*sqrt(2)/2;  // (R-S)*sqrt(2)/2;
-        $fa=15;
-        intersection() {
-            cube(size, center=true);
-            hull() {
-                for (xs=[1,-1]) for (ys=[1,-1]) for (zs=[1,-1]) {
-                    translate([xs*(x-O), ys*(y-O), zs*(z-O)]) sphere(r=R);
-                    translate([0, ys*(y-O), zs*(z-O)])
-                        rotate([0, xs*90, 0]) cylinder(r=R, h=x-R);
-                    translate([xs*(x-O), 0, zs*(z-O)])
-                        rotate([ys*90, 0, 0]) cylinder(r=R, h=y-R);
-                    translate([xs*(x-O), ys*(y-O), 0])
-                        rotate([zs*90+90, 0, 0]) cylinder(r=R, h=z-R);
-                }
-            }
+    translate(origin) hull() intersection() {
+        cube(size, center=true);
+        union() {
+            axis(size[0]/2, size[1]/2, size[2]/2);
+            axis(size[2]/2, size[1]/2, size[0]/2, [0, 90, 0]);
+            axis(size[0]/2, size[2]/2, size[1]/2, [90, 0, 0]);
         }
     }
 }
 
 // TODO: dividers
-// TODO: logos & labels
 module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
                seam=seam0, rise=rise0, rounded=true, lid=false, ghost=undef) {
     module side(w, d0, d1, h0, h1) {
