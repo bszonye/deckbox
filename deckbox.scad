@@ -96,11 +96,12 @@ module bullnose_cube(size, r=floor0, center=false) {
     }
 }
 
-test_ext = [inch, inch/2, 2*inch];
+// test_ext = [inch, inch/2, 2*inch];
+test_ext = [76.0, 35.2, 98.5];
 test_int = test_ext - [2*3.3, 2*2.3, 2*floor0];
 
 difference() {
-    bullnose_cube([inch, inch/2, 2*inch], r=2);
+    bullnose_cube(test_ext, r=2);
     raise(4) cbox(2*test_ext);
     raise() cbox(test_int);
 }
