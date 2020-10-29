@@ -1,4 +1,5 @@
 layer_height = 0.2;
+min_layer_height = 0.07;
 extrusion_width = 0.45;
 extrusion_overlap = layer_height * (1 - PI/4);
 extrusion_spacing = extrusion_width - extrusion_overlap;
@@ -25,28 +26,92 @@ function qthin(x=xwall(), n=4.5) = x < xwall(n) ? qwall(x) : x;
 function cthin(x=xwall(), n=4.5) = x < xwall(n) ? cwall(x) : x;
 function fthin(x=xwall(), n=4.5) = x < xwall(n) ? fwall(x) : x;
 
+// convert between layer counts and height, qlayer to quantize
+function zlayer(n=1) = n*layer_height;
+function nlayer(z=zlayer()) = z/layer_height;
+// quantize heights
+function qlayer(z=zlayer()) = zlayer(round(nlayer(z)));
+function clayer(z=zlayer()) = zlayer(ceil(nlayer(z)));
+function flayer(z=zlayer()) = zlayer(floor(nlayer(z)));
+
 tolerance = 0.001;
-border = 1;
 
-$fa = 15;
-$fs = min(layer_height/2, xspace(1)/2);
+$fa = 5;
+$fs = min_layer_height / 2;  // avoid aliasing
+// $fs = min(layer_height/2, xspace(1)/2);
 
-card = [2.5*25.4, 0.325, 3.5*25.4];  // standard playing card dimensions
-double_sleeve = 0.3;
-thick_sleeve = 0.2;
-thin_sleeve = 0.1;
-function double_sleeve_count(d) = floor(d / (card[1] + double_sleeve));
-function thick_sleeve_count(d) = floor(d / (card[1] + thick_sleeve));
-function thin_sleeve_count(d) = floor(d / (card[1] + thin_sleeve));
-function unsleeved_count(d) = floor(d / card[1]);
+inch = 25.4;
+card = [2.5*inch, 3.5*inch];  // standard playing card dimensions
+
+// seams add about 1/2mm to each dimension
+sand_sleeve = [81, 122];  // Dixit
+orange_sleeve = [73, 122];  // Tarot
+magenta_sleeve = [72, 112];  // Scythe
+brown_sleeve = [67, 103];  // 7 Wonders
+lime_sleeve = [82, 82];  // Big Square
+blue_sleeve = [73, 73];  // Square
+dark_blue_sleeve = [53, 53];  // Mini Square
+gray_sleeve = [66, 91];  // Standard Card
+purple_sleeve = [62, 94];  // Standard European
+ruby_sleeve = [46, 71];  // Mini European
+green_sleeve = [59, 91];  // Standard American
+yellow_sleeve = [44, 67];  // Mini American
+catan_sleeve = [56, 82];  // Catan (English)
+
+no_sleeve = 0.35;  // common unsleeved card thickness (UG assumes 0.325)
+thin_sleeve = 0.1;  // 50 micron sleeves
+thick_sleeve = 0.2;  // 100 micron sleeves
+double_sleeve = thick_sleeve + thin_sleeve;
+function double_sleeve_count(d) = floor(d / (no_sleeve + double_sleeve));
+function thick_sleeve_count(d) = floor(d / (no_sleeve + thick_sleeve));
+function thin_sleeve_count(d) = floor(d / (no_sleeve + thin_sleeve));
+function unsleeved_count(d) = floor(d / no_sleeve);
+function vdeck(n=1, sleeve=double_sleeve, card=yellow_sleeve) =
+    [card[0], card[1], n*(no_sleeve+sleeve)];
 
 function unit_axis(n) = [for (i=[0:1:2]) i==n ? 1 : 0];
 
+floor0 = qlayer(inch/16);
+wall0 = qwall(floor0);
+gap0 = 0.1;
+
+module raise(z=floor0) {
+    translate([0, 0, z]) children();
+}
+
+module cbox(size, center=false) {
+    linear_extrude(size[2], center=center)
+        square([size[0], size[1]], center=true);
+}
+
+module bullnose_cube(size, r=floor0, center=false) {
+    origin = [0, 0, center ? 0 : size[2]/2];
+    c = size/2 - [r, r, r];
+    translate(origin) hull() {
+        cube([size[0], 2*c[1], 2*c[2]], center=true);
+        cube([2*c[0], size[1], 2*c[2]], center=true);
+        cube([2*c[0], 2*c[1], size[2]], center=true);
+        for (x=[1, -1]) for (y=[1, -1]) for (z=[1, -1])
+            translate([c[0]*x, c[1]*y, c[2]*z]) sphere(r);
+    }
+}
+
+test_ext = [inch, inch/2, 2*inch];
+test_int = test_ext - [2*3.3, 2*2.3, 2*floor0];
+
+difference() {
+    bullnose_cube([inch, inch/2, 2*inch], r=2);
+    raise(4) cbox(2*test_ext);
+    raise() cbox(test_int);
+}
+
+
+// TODO: old code, update or remove this
 // common sleeve dimensions
 FFG = [66.5, 0.2, 94];
 
-wall0 = xwall(3);
-gap0 = 0.1;
+// wall0 = xwall(3);
+// gap0 = 0.1;
 thick0 = 2*wall0 + gap0;
 join0 = 10;
 seam0 = 1/3;
@@ -224,37 +289,8 @@ module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
     }
 }
 
-// commercial box sizes
-Boulder100int = [68.5, 67.5, 93];
-Boulder80int = [68.5, 55, 93];
-Boulder60int = [68.5, 46.5, 93];
-Boulder40int = [68.5, 30, 93];
-Boulder100ext = [76, 75, 93];
-Boulder80ext = [76, 60, 98.5];
-Boulder60ext = [76, 49.9, 98.5];
-Boulder40ext = [76, 35, 98.5];
-
-Rocky75 = [75, 300/4, 98.5];
-Rocky60 = [75, 300/5, 98.5];
-Rocky50 = [75, 300/6, 98.5];
-Rocky37 = [75, 300/8, 98.5];
-Rocky33 = [75, 300/9, 98.5];
 Rocky30 = [75, 300/10, 98.5];
-Rocky25 = [75, 300/12, 98.5];
-
-*deckbox(Rocky, ghost=false);
-*deckbox(Rocky, lid=true, ghost=false);
-*deckbox(in=Boulder80, ghost=true);
-*deckbox(in=Boulder80, lid=true);
-
-*set([25, 40*.6, 60], seam=0.2, rise=0.6);
-*set([25, 25, 25], seam=0.1, rise=0.8);
-
-*set(Rocky30);
-*deckbox(Rocky30);
-*deckbox(Rocky30, lid=true);
-
-deckbox(Rocky30, lid=true) {
+*deckbox(Rocky30, lid=true) {
     $fa=6;
     difference() {
         circle(d=45);
@@ -264,9 +300,6 @@ deckbox(Rocky30, lid=true) {
          halign="center", valign="center");
 }
 
-*bevel_test([25, 25, 5]);
-
-*rounded_cube(Rocky30);
 
 // measurements (mm)
 
